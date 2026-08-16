@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Statement Parser to Clipboard",
+  "version": "1.0",
+  "permissions": [
+    "activeTab",
+    "clipboardWrite",
+    "scripting"
+  ],
+  "action": {
+    "default_title": "Extract Transactions to Clipboard"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
+}
