@@ -1,17 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "Statement Parser to Clipboard",
+  "name": "AccèsD Transactions Extractor",
   "version": "1.0",
   "permissions": [
     "activeTab",
-    "clipboardWrite",
     "scripting"
   ],
   "action": {
-    "default_title": "Extract Transactions to Clipboard"
+    "default_title": "Copier les transactions"
   },
   "background": {
-    "service_worker": "background.js",
-    "type": "module"
+    "service_worker": "background.js"
   }
 }

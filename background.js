@@ -1,65 +1,67 @@
-import * as pdfjsLib from './pdf.mjs';
-import { parsePDFText } from './parser.js';
-
-// Configuration explicite du Worker avec l'URL de l'extension
-pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('pdf.worker.mjs');
-
 chrome.action.onClicked.addListener(async (tab) => {
-  if (!tab.url) return;
+  if (!tab.id) return;
 
   try {
-    let arrayBuffer;
-
-    // Si c'est un fichier local file://, on passe par le contexte de la page pour lire les octets
-    if (tab.url.startsWith('file://')) {
-      const [results] = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: async () => {
-          const res = await fetch(window.location.href);
-          const buf = await res.arrayBuffer();
-          return Array.from(new Uint8Array(buf));
-        }
-      });
-      arrayBuffer = new Uint8Array(results.result).buffer;
-    } else {
-      const response = await fetch(tab.url);
-      arrayBuffer = await response.arrayBuffer();
-    }
-
-    const loadingTask = pdfjsLib.getDocument({
-      data: new Uint8Array(arrayBuffer),
-      useSystemFonts: true,
-      disableFontFace: true
-    });
-
-    const pdf = await loadingTask.promise;
-    let fullText = "";
-
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const content = await page.getTextContent();
-      
-      const pageStrings = content.items.map(item => item.str);
-      fullText += pageStrings.join(" ") + "\n";
-    }
-
-    const resultText = parsePDFText(fullText);
-
-    if (!resultText) {
-      console.warn("No transactions found.");
-      return;
-    }
-
-    await chrome.scripting.executeScript({
+    const [results] = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      func: (textToCopy) => {
-        navigator.clipboard.writeText(textToCopy);
-        alert("Transactions copied to clipboard!");
-      },
-      args: [resultText]
-    });
+      func: () => {
+        const transactions = [];
+        const panels = document.querySelectorAll("[id^='mobile-desc-trx']");
 
+        panels.forEach((panel) => {
+          let cardNumber = "";
+          const cardElement = panel.querySelector("p strong");
+          if (cardElement) {
+            const cardMatch = cardElement.innerText.match(/(\d{4})\s*$/);
+            if (cardMatch) cardNumber = cardMatch[1];
+          }
+
+          const table = panel.querySelector("table");
+          if (!table) return;
+
+          let currentDate = "";
+          const rows = table.querySelectorAll("tbody tr");
+
+          rows.forEach((row) => {
+            const dateHeader = row.querySelector("th.sous-titre");
+            if (dateHeader) {
+              currentDate = dateHeader.innerText.trim();
+              return;
+            }
+
+            const tds = row.querySelectorAll("td");
+            if (tds.length >= 2) {
+              const description = tds[0].innerText.replace(/\s+/g, " ").trim();
+              const rawAmount = tds[1].innerText.replace(/\s+/g, " ").trim();
+
+              const isCredit = rawAmount.includes("CR");
+              const cleanAmount = rawAmount
+                .replace("CR", "")
+                .replace("$", "")
+                .replace(/\s/g, "")
+                .replace(",", ".");
+
+              const debit = isCredit ? "" : cleanAmount;
+              const credit = isCredit ? cleanAmount : "";
+
+              if (description && cleanAmount) {
+                transactions.push(`${currentDate}\t${description}\t${debit}\t${credit}\t${cardNumber}`);
+              }
+            }
+          });
+        });
+
+        const resultText = transactions.join("\n");
+
+        if (resultText) {
+          navigator.clipboard.writeText(resultText);
+          alert(`${transactions.length} transactions copiées dans le presse-papier !`);
+        } else {
+          alert("Aucune transaction trouvée sur la page.");
+        }
+      }
+    });
   } catch (err) {
-    console.error("Failed to parse PDF:", err);
+    console.error("Erreur lors de l'extraction :", err);
   }
 });
