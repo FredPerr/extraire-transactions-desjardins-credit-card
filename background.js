@@ -53,8 +53,7 @@ chrome.action.onClicked.addListener(async (tab) => {
             const cleanAmount = rawAmount
               .replace("CR", "")
               .replace("$", "")
-              .replace(/\s/g, "")
-              .replace(",", ".");
+              .replace(/\s/g, "");
 
             const debit = isCredit ? "" : cleanAmount;
             const credit = isCredit ? cleanAmount : "";
